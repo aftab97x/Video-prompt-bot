@@ -8,4 +8,5 @@ const nextConfig = {
     responseLimit: false,
   },
 }
+
 module.exports = nextConfig
