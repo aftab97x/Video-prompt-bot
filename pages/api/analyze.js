@@ -1,104 +1,176 @@
 import Groq from 'groq-sdk'
 import { supabase } from '../../lib/supabase'
 
+// â”€â”€ Groq: analyze video frames
 async function analyzeWithGroq(base64Video, type) {
   const groq = new Groq({ apiKey: process.env.GROQ_API_KEY })
+
   const prompt = type === 'prompt'
-    ? `Analyze this video and create video prompts for 5 platforms. Respond ONLY in JSON:
-{"YouTube":"...","Facebook":"...","TikTok":"...","Instagram":"...","X (Twitter)":"..."}`
-    : `Analyze this video and write scripts for 5 platforms. Respond ONLY in JSON:
-{"YouTube":"...","Facebook":"...","TikTok":"...","Instagram":"...","X (Twitter)":"..."}`
+    ? `You are a professional video content analyzer. Analyze this video and create detailed video prompts for 5 platforms: YouTube, Facebook, TikTok, Instagram, X (Twitter). For each platform, write a compelling video prompt optimized for that platform's audience and algorithm. Respond ONLY in this exact JSON format:
+{
+  "YouTube": "...",
+  "Facebook": "...",
+  "TikTok": "...",
+  "Instagram": "...",
+  "X (Twitter)": "..."
+}`
+    : `You are a professional video script writer. Analyze this video and write engaging scripts for 5 platforms: YouTube, Facebook, TikTok, Instagram, X (Twitter). Each script should match that platform's style and duration. Respond ONLY in this exact JSON format:
+{
+  "YouTube": "...",
+  "Facebook": "...",
+  "TikTok": "...",
+  "Instagram": "...",
+  "X (Twitter)": "..."
+}`
 
   const response = await groq.chat.completions.create({
     model: 'meta-llama/llama-4-scout-17b-16e-instruct',
-    messages: [{
-      role: 'user',
-      content: [
-        { type: 'image_url', image_url: { url: `data:video/mp4;base64,${base64Video}` } },
-        { type: 'text', text: prompt }
-      ]
-    }],
+    messages: [
+      {
+        role: 'user',
+        content: [
+          {
+            type: 'image_url',
+            image_url: { url: `data:video/mp4;base64,${base64Video}` }
+          },
+          { type: 'text', text: prompt }
+        ]
+      }
+    ],
     max_tokens: 2000,
     temperature: 0.7,
   })
+
   const text = response.choices[0].message.content
   return JSON.parse(text.replace(/```json\n?|\n?```/g, '').trim())
 }
 
+// â”€â”€ Cohere: Command R+
 async function analyzeWithCohere(description, type) {
   const prompt = type === 'prompt'
-    ? `Video: "${description}". Create platform prompts. JSON only: {"YouTube":"...","Facebook":"...","TikTok":"...","Instagram":"...","X (Twitter)":"..."}`
-    : `Video: "${description}". Write platform scripts. JSON only: {"YouTube":"...","Facebook":"...","TikTok":"...","Instagram":"...","X (Twitter)":"..."}`
+    ? `Based on this video description: "${description}"
+Create professional video prompts for 5 platforms. Respond ONLY in JSON:
+{"YouTube":"...","Facebook":"...","TikTok":"...","Instagram":"...","X (Twitter)":"..."}`
+    : `Based on this video description: "${description}"
+Write engaging video scripts for 5 platforms. Respond ONLY in JSON:
+{"YouTube":"...","Facebook":"...","TikTok":"...","Instagram":"...","X (Twitter)":"..."}`
 
   const res = await fetch('https://api.cohere.com/v1/generate', {
     method: 'POST',
-    headers: { 'Authorization': `Bearer ${process.env.COHERE_API_KEY}`, 'Content-Type': 'application/json' },
-    body: JSON.stringify({ model: 'command-r-plus', prompt, max_tokens: 1500, temperature: 0.7 })
+    headers: {
+      'Authorization': `Bearer ${process.env.COHERE_API_KEY}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      model: 'command-r-plus',
+      prompt,
+      max_tokens: 1500,
+      temperature: 0.7,
+    })
   })
   const data = await res.json()
-  return JSON.parse(data.generations[0].text.replace(/```json\n?|\n?```/g, '').trim())
+  const text = data.generations[0].text
+  return JSON.parse(text.replace(/```json\n?|\n?```/g, '').trim())
 }
 
+// â”€â”€ OpenRouter: DeepSeek R1
 async function analyzeWithOpenRouter(description, type) {
   const prompt = type === 'prompt'
-    ? `Video: "${description}". Platform prompts JSON: {"YouTube":"...","Facebook":"...","TikTok":"...","Instagram":"...","X (Twitter)":"..."}`
-    : `Video: "${description}". Platform scripts JSON: {"YouTube":"...","Facebook":"...","TikTok":"...","Instagram":"...","X (Twitter)":"..."}`
+    ? `Video description: "${description}". Create video prompts for YouTube, Facebook, TikTok, Instagram, X (Twitter). JSON only: {"YouTube":"...","Facebook":"...","TikTok":"...","Instagram":"...","X (Twitter)":"..."}`
+    : `Video description: "${description}". Write video scripts for YouTube, Facebook, TikTok, Instagram, X (Twitter). JSON only: {"YouTube":"...","Facebook":"...","TikTok":"...","Instagram":"...","X (Twitter)":"..."}`
 
   const res = await fetch('https://openrouter.ai/api/v1/chat/completions', {
     method: 'POST',
-    headers: { 'Authorization': `Bearer ${process.env.OPENROUTER_API_KEY}`, 'Content-Type': 'application/json' },
-    body: JSON.stringify({ model: 'deepseek/deepseek-r1:free', messages: [{ role: 'user', content: prompt }], max_tokens: 1500 })
+    headers: {
+      'Authorization': `Bearer ${process.env.OPENROUTER_API_KEY}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      model: 'deepseek/deepseek-r1:free',
+      messages: [{ role: 'user', content: prompt }],
+      max_tokens: 1500,
+    })
   })
   const data = await res.json()
-  return JSON.parse(data.choices[0].message.content.replace(/```json\n?|\n?```/g, '').trim())
+  const text = data.choices[0].message.content
+  return JSON.parse(text.replace(/```json\n?|\n?```/g, '').trim())
 }
 
+// â”€â”€ Sambanova: Llama 3.3 70B
 async function analyzeWithSambanova(description, type) {
   const prompt = type === 'prompt'
-    ? `Video: "${description}". Platform prompts JSON: {"YouTube":"...","Facebook":"...","TikTok":"...","Instagram":"...","X (Twitter)":"..."}`
-    : `Video: "${description}". Platform scripts JSON: {"YouTube":"...","Facebook":"...","TikTok":"...","Instagram":"...","X (Twitter)":"..."}`
+    ? `Video: "${description}". Create platform-specific video prompts. JSON: {"YouTube":"...","Facebook":"...","TikTok":"...","Instagram":"...","X (Twitter)":"..."}`
+    : `Video: "${description}". Write platform-specific scripts. JSON: {"YouTube":"...","Facebook":"...","TikTok":"...","Instagram":"...","X (Twitter)":"..."}`
 
   const res = await fetch('https://api.sambanova.ai/v1/chat/completions', {
     method: 'POST',
-    headers: { 'Authorization': `Bearer ${process.env.SAMBANOVA_API_KEY}`, 'Content-Type': 'application/json' },
-    body: JSON.stringify({ model: 'Meta-Llama-3.3-70B-Instruct', messages: [{ role: 'user', content: prompt }], max_tokens: 1500 })
+    headers: {
+      'Authorization': `Bearer ${process.env.SAMBANOVA_API_KEY}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      model: 'Meta-Llama-3.3-70B-Instruct',
+      messages: [{ role: 'user', content: prompt }],
+      max_tokens: 1500,
+      temperature: 0.7,
+    })
   })
   const data = await res.json()
-  return JSON.parse(data.choices[0].message.content.replace(/```json\n?|\n?```/g, '').trim())
+  const text = data.choices[0].message.content
+  return JSON.parse(text.replace(/```json\n?|\n?```/g, '').trim())
 }
 
+// â”€â”€ Cerebras: Llama 3.1 70B
 async function analyzeWithCerebras(description, type) {
   const prompt = type === 'prompt'
-    ? `Video: "${description}". Platform prompts JSON: {"YouTube":"...","Facebook":"...","TikTok":"...","Instagram":"...","X (Twitter)":"..."}`
-    : `Video: "${description}". Platform scripts JSON: {"YouTube":"...","Facebook":"...","TikTok":"...","Instagram":"...","X (Twitter)":"..."}`
+    ? `Video: "${description}". Platform video prompts in JSON: {"YouTube":"...","Facebook":"...","TikTok":"...","Instagram":"...","X (Twitter)":"..."}`
+    : `Video: "${description}". Platform video scripts in JSON: {"YouTube":"...","Facebook":"...","TikTok":"...","Instagram":"...","X (Twitter)":"..."}`
 
   const res = await fetch('https://api.cerebras.ai/v1/chat/completions', {
     method: 'POST',
-    headers: { 'Authorization': `Bearer ${process.env.CEREBRAS_API_KEY}`, 'Content-Type': 'application/json' },
-    body: JSON.stringify({ model: 'llama3.1-70b', messages: [{ role: 'user', content: prompt }], max_tokens: 1500 })
+    headers: {
+      'Authorization': `Bearer ${process.env.CEREBRAS_API_KEY}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      model: 'llama3.1-70b',
+      messages: [{ role: 'user', content: prompt }],
+      max_tokens: 1500,
+      temperature: 0.7,
+    })
   })
   const data = await res.json()
-  return JSON.parse(data.choices[0].message.content.replace(/```json\n?|\n?```/g, '').trim())
+  const text = data.choices[0].message.content
+  return JSON.parse(text.replace(/```json\n?|\n?```/g, '').trim())
 }
 
+// â”€â”€ Main handler
 export default async function handler(req, res) {
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' })
 
   const { videoBase64, type, fileName } = req.body
-  if (!videoBase64 || !type) return res.status(400).json({ error: 'Missing fields' })
+
+  if (!videoBase64 || !type) {
+    return res.status(400).json({ error: 'Missing videoBase64 or type' })
+  }
 
   const startTime = Date.now()
 
   try {
-    let groqResult, videoDescription = ''
+    // Step 1: Groq analyzes video first
+    let groqResult
+    let videoDescription = ''
+
     try {
       groqResult = await analyzeWithGroq(videoBase64, type)
       videoDescription = Object.values(groqResult).join(' ').substring(0, 500)
     } catch (e) {
+      console.error('Groq error:', e)
       groqResult = { error: e.message }
       videoDescription = 'A video with dynamic content and engaging visuals.'
     }
 
+    // Step 2: Other 4 AIs run in parallel using Groq's description
     const [cohereResult, openrResult, sambaResult, cerebrasResult] = await Promise.allSettled([
       analyzeWithCohere(videoDescription, type),
       analyzeWithOpenRouter(videoDescription, type),
@@ -116,6 +188,7 @@ export default async function handler(req, res) {
 
     const duration = Date.now() - startTime
 
+    // Step 3: Log to Supabase
     try {
       await supabase.from('analyses').insert({
         file_name: fileName || 'unknown',
@@ -129,15 +202,21 @@ export default async function handler(req, res) {
         created_at: new Date().toISOString(),
       })
     } catch (dbErr) {
-      console.error('Supabase error:', dbErr)
+      console.error('Supabase log error:', dbErr)
     }
 
     return res.status(200).json({ results, duration })
+
   } catch (error) {
+    console.error('API error:', error)
     return res.status(500).json({ error: error.message })
   }
 }
 
 export const config = {
-  api: { bodyParser: { sizeLimit: '100mb' } }
-        }
+  api: {
+    bodyParser: {
+      sizeLimit: '100mb',
+    },
+  },
+}
