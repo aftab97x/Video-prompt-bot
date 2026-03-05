@@ -439,7 +439,7 @@ export default function Home() {
         <div className="header">
           <div className="badge">
             <div className="badge-dot" />
-            AI Powered · Gemini
+            Powered by Zypt 
           </div>
           <h1>Video <em>Prompt</em><br />Generator</h1>
           <p className="subtitle">ভিডিও আপলোড করুন, AI আপনার জন্য সেরা prompt তৈরি করবে</p>
