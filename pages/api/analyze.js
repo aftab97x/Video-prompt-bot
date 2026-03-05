@@ -19,7 +19,9 @@ export default async function handler(req, res) {
   if (!frames || !Array.isArray(frames) || frames.length === 0) {
     return res.status(400).json({ error: "frames array required" });
   }
-
+if (frames.length > 10) {
+  return res.status(400).json({ error: "Maximum 10 frames allowed" });
+}
   const apiKey = process.env.ANTHROPIC_API_KEY;
   if (!apiKey) {
     return res.status(500).json({ error: "API key not configured" });
@@ -84,9 +86,15 @@ Response format (JSON only, no markdown, no backticks):
 
     const text = data.content.map((c) => c.text || "").join("");
     const cleaned = text.replace(/```json|```/g, "").trim();
-    const parsed = JSON.parse(cleaned);
+    let parsed;
+try {
+  parsed = JSON.parse(cleaned);
+} catch (parseError) {
+  return res.status(500).json({ error: "Failed to parse AI response" });
+}
 
-    return res.status(200).json(parsed);
+
+    return res.status(200).json(parsed
   } catch (err) {
     console.error("Analyze error:", err);
     return res.status(500).json({ error: err.message });
