@@ -1,10 +1,10 @@
 // pages/api/analyze.js
-// âœ… Anthropic API key à¦à¦–à¦¾à¦¨à§‡ safe - client à¦•à¦–à¦¨à§‹ à¦¦à§‡à¦–à¦¤à§‡ à¦ªà¦¾à¦¬à§‡ à¦¨à¦¾
+// ✅ Gemini API key is safe here - client cannot access this
 
 export const config = {
   api: {
     bodyParser: {
-      sizeLimit: "20mb", // à¦­à¦¿à¦¡à¦¿à¦“ frames à¦à¦° à¦œà¦¨à§à¦¯ à¦¬à¦¡à¦¼ limit
+      sizeLimit: "20mb",
     },
   },
 };
@@ -19,64 +19,54 @@ export default async function handler(req, res) {
   if (!frames || !Array.isArray(frames) || frames.length === 0) {
     return res.status(400).json({ error: "frames array required" });
   }
-if (frames.length > 10) {
-  return res.status(400).json({ error: "Maximum 10 frames allowed" });
-}
-  const apiKey = process.env.ANTHROPIC_API_KEY;
+
+  if (frames.length > 10) {
+    return res.status(400).json({ error: "Maximum 10 frames allowed" });
+  }
+
+  const apiKey = process.env.GEMINI_API_KEY;
   if (!apiKey) {
     return res.status(500).json({ error: "API key not configured" });
   }
 
   try {
-    const imageContent = frames.map((b64) => ({
-      type: "image",
-      source: { type: "base64", media_type: "image/jpeg", data: b64 },
+    const imageParts = frames.map((b64) => ({
+      inlineData: { mimeType: "image/jpeg", data: b64 },
     }));
 
-    const response = await fetch("https://api.anthropic.com/v1/messages", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "x-api-key": apiKey,
-        "anthropic-version": "2023-06-01",
-      },
-      body: JSON.stringify({
-        model: "claude-sonnet-4-20250514",
-        max_tokens: 1500,
-        system: `à¦¤à§à¦®à¦¿ à¦à¦•à¦œà¦¨ expert video content creator à¦à¦¬à¦‚ prompt engineerà¥¤ 
-à¦­à¦¿à¦¡à¦¿à¦“à¦° à¦«à§à¦°à§‡à¦® à¦¦à§‡à¦–à§‡ style, aesthetic, mood, content à¦¬à¦¿à¦¶à§à¦²à§‡à¦·à¦£ à¦•à¦°à§‡ 
-similar à¦­à¦¿à¦¡à¦¿à¦“ à¦¬à¦¾à¦¨à¦¾à¦¨à§‹à¦° à¦œà¦¨à§à¦¯ detailed prompts à¦²à§‡à¦–à§‹à¥¤
+    const prompt = `You are an expert video content creator and prompt engineer.
+Analyze the style, aesthetic, mood, and content from the video frames provided,
+then write detailed prompts to recreate similar videos.
 
 Response format (JSON only, no markdown, no backticks):
 {
-  "video_analysis": "à¦­à¦¿à¦¡à¦¿à¦“à¦Ÿà¦¿ à¦¸à¦®à§à¦ªà¦°à§à¦•à§‡ à¦¸à¦‚à¦•à§à¦·à¦¿à¦ªà§à¦¤ à¦¬à¦¿à¦¶à§à¦²à§‡à¦·à¦£ (2-3 à¦¬à¦¾à¦•à§à¦¯)",
-  "style": "à¦­à¦¿à¦¡à¦¿à¦“à¦° visual style (à¦¸à¦‚à¦•à§à¦·à¦¿à¦ªà§à¦¤)",
-  "mood": "à¦­à¦¿à¦¡à¦¿à¦“à¦° mood/tone (à¦¸à¦‚à¦•à§à¦·à¦¿à¦ªà§à¦¤)",
+  "video_analysis": "Brief analysis of the video (2-3 sentences)",
+  "style": "Visual style of the video (brief)",
+  "mood": "Mood/tone of the video (brief)",
   "prompts": [
     {
-      "title": "Prompt à¦à¦° à¦¨à¦¾à¦®",
+      "title": "Name of the prompt",
       "platform": "YouTube/TikTok/Instagram/Sora/Kling/RunwayML",
-      "prompt": "à¦¬à¦¿à¦¸à§à¦¤à¦¾à¦°à¦¿à¦¤ prompt (à¦¬à¦¾à¦‚à¦²à¦¾à¦¯à¦¼)",
+      "prompt": "Detailed prompt in Bengali",
       "english_prompt": "Detailed prompt in English for AI video tools"
     }
   ]
 }
 
-à§ª-à§«à¦Ÿà¦¿ à¦†à¦²à¦¾à¦¦à¦¾ platform à¦à¦° à¦œà¦¨à§à¦¯ prompt à¦¦à¦¾à¦“à¥¤`,
-        messages: [
-          {
-            role: "user",
-            content: [
-              ...imageContent,
-              {
-                type: "text",
-                text: `à¦à¦‡ à¦­à¦¿à¦¡à¦¿à¦“à¦° ${frames.length}à¦Ÿà¦¿ à¦«à§à¦°à§‡à¦® à¦¦à§‡à¦–à§‡ à¦¬à¦¿à¦¶à§à¦²à§‡à¦·à¦£ à¦•à¦°à§‹ à¦à¦¬à¦‚ à¦à¦‡ à¦­à¦¿à¦¡à¦¿à¦“à¦° à¦®à¦¤à§‹ à¦­à¦¿à¦¡à¦¿à¦“ à¦¬à¦¾à¦¨à¦¾à¦¨à§‹à¦° à¦œà¦¨à§à¦¯ detailed prompts à¦²à§‡à¦–à§‹à¥¤`,
-              },
-            ],
-          },
-        ],
-      }),
-    });
+Provide prompts for 4-5 different platforms.
+Analyze these ${frames.length} frames from the video.`;
+
+    const response = await fetch(
+      `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`,
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          contents: [{ parts: [...imageParts, { text: prompt }] }],
+          generationConfig: { maxOutputTokens: 1500 },
+        }),
+      }
+    );
 
     const data = await response.json();
 
@@ -84,19 +74,19 @@ Response format (JSON only, no markdown, no backticks):
       return res.status(500).json({ error: data.error.message });
     }
 
-    const text = data.content.map((c) => c.text || "").join("");
+    const text = data.candidates[0].content.parts[0].text;
     const cleaned = text.replace(/```json|```/g, "").trim();
+
     let parsed;
-try {
-  parsed = JSON.parse(cleaned);
-} catch (parseError) {
-  return res.status(500).json({ error: "Failed to parse AI response" });
-}
+    try {
+      parsed = JSON.parse(cleaned);
+    } catch (parseError) {
+      return res.status(500).json({ error: "Failed to parse AI response" });
+    }
 
-
-    return res.status(200).json(parsed
+    return res.status(200).json(parsed);
   } catch (err) {
     console.error("Analyze error:", err);
     return res.status(500).json({ error: err.message });
   }
-              }
+}
