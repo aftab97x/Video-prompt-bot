@@ -1,5 +1,5 @@
 // pages/api/analyze.js
-// ✅ Gemini API key is safe here - client cannot access this
+// ✅ Groq API key is safe here - client cannot access this
 
 export const config = {
   api: {
@@ -24,18 +24,17 @@ export default async function handler(req, res) {
     return res.status(400).json({ error: "Maximum 10 frames allowed" });
   }
 
-  const apiKey = process.env.GEMINI_API_KEY;
+  const apiKey = process.env.GROQ_API_KEY;
   if (!apiKey) {
     return res.status(500).json({ error: "API key not configured" });
   }
 
   try {
-    const imageParts = frames.map((b64) => ({
-      inlineData: { mimeType: "image/jpeg", data: b64 },
-    }));
+    // Groq শুধু ১টা image নেয়, তাই মাঝের frame ব্যবহার করি
+    const middleFrame = frames[Math.floor(frames.length / 2)];
 
     const prompt = `You are an expert video content creator and prompt engineer.
-Analyze the style, aesthetic, mood, and content from the video frames provided,
+Analyze the style, aesthetic, mood, and content from the video frame provided,
 then write detailed prompts to recreate similar videos.
 
 Response format (JSON only, no markdown, no backticks):
@@ -53,20 +52,36 @@ Response format (JSON only, no markdown, no backticks):
   ]
 }
 
-Provide prompts for 4-5 different platforms.
-Analyze these ${frames.length} frames from the video.`;
+Provide prompts for 4-5 different platforms.`;
 
-    const response = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-lite:generateContent?key=${apiKey}`,
-      {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          contents: [{ parts: [...imageParts, { text: prompt }] }],
-          generationConfig: { maxOutputTokens: 1500 },
-        }),
-      }
-    );
+    const response = await fetch("https://api.groq.com/openai/v1/chat/completions", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "Authorization": `Bearer ${apiKey}`,
+      },
+      body: JSON.stringify({
+        model: "llama-3.2-11b-vision-preview",
+        max_tokens: 1500,
+        messages: [
+          {
+            role: "user",
+            content: [
+              {
+                type: "image_url",
+                image_url: {
+                  url: `data:image/jpeg;base64,${middleFrame}`,
+                },
+              },
+              {
+                type: "text",
+                text: prompt,
+              },
+            ],
+          },
+        ],
+      }),
+    });
 
     const data = await response.json();
 
@@ -74,7 +89,7 @@ Analyze these ${frames.length} frames from the video.`;
       return res.status(500).json({ error: data.error.message });
     }
 
-    const text = data.candidates[0].content.parts[0].text;
+    const text = data.choices[0].message.content;
     const cleaned = text.replace(/```json|```/g, "").trim();
 
     let parsed;
